@@ -1,0 +1,141 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Data;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Web;
+using System.Web.UI;
+using System.Web.UI.WebControls;
+
+public partial class content_login : System.Web.UI.Page
+{
+    DataTable dt = new DataTable();
+    static int sentOtp = 0;
+    UserClass Um = new UserClass();
+    AddUsers us = new AddUsers();
+
+    protected void Page_Load(object sender, EventArgs e)
+    {
+        if (!IsPostBack)
+        {
+            Session.Abandon();
+            Session.Clear();
+            Session.RemoveAll();
+        }
+    }
+  
+    protected void btnSend_Click(object sender, EventArgs e)
+    {
+        Button btn = (Button)sender;
+        btn.Text = (Int32.Parse(btn.Text) + 1).ToString();
+        if (txtPhone.Text.Length > 0)
+        {
+            string numbers = txtPhone.Text;
+            DataSet ds = us.GetUserDetails(numbers);
+            if (ds.Tables[0].Rows.Count != 0)
+            {
+                Random rand = new Random();
+                // string apikey = "m6PQ8S6Ivr4-v7VgZ9cmflrCh8TxDnrz8n9iNbZGRr";
+                sentOtp = rand.Next(100000, 999999);
+                //string senders = "TXTLCL";
+                string senders = "STAYLO";
+
+                // http://37.59.76.46/api/mt/SendSMS?user=NIDA_CLICK&password=q12345&senderid=HUMANS&channel=TRANS&DCS=0&flashsms=0&number=7985648892&text= hello Test &route=02  
+                String url = "http://37.59.76.46/api/mt/SendSMS?user=STAYLO&password=8604@sms&senderid=" + senders + "&channel=TRANS&DCS=0&flashsms=0&number=" + numbers + "&text=" + sentOtp + "&route=02";
+                // String url = "https://api.textlocal.in/send/?apikey=" + apikey + "&numbers=" + numbers + "&message=" + sentOtp + "&sender=" + senders;
+                //Store the OTP in session to verify in next page.
+                //If you want to verify from DB store the OTP in DB for verification. But it will take space
+                Session["OTP"] = sentOtp;
+                try
+                {
+                    //Create the request and send data to Ozeki NG SMS Gateway Server by HTTP connection;
+
+                    HttpWebRequest myReq = (HttpWebRequest)WebRequest.Create(url);
+                    HttpWebResponse myResp = (HttpWebResponse)myReq.GetResponse();
+                    System.IO.StreamReader respStreamReader = new System.IO.StreamReader(myResp.GetResponseStream());
+                    string responseString = respStreamReader.ReadToEnd();
+                    respStreamReader.Close();
+                    myResp.Close();
+
+                    //inform the user
+                    // lblmessage.Text = responseString;
+                    lblmessage.Text = "OTP Sent Successfully";
+                    lblmessage.ForeColor = System.Drawing.Color.Green;
+                    lblmessage.Visible = true;
+                    foreach (DataRow dr in ds.Tables[0].Rows)
+                    {
+                        HttpContext.Current.Session["s_id"] = dr["s_id"].ToString();
+                        HttpContext.Current.Session["s_Name"] = dr["s_Name"].ToString();
+                        HttpContext.Current.Session["s_MobileNo"] = dr["s_MobileNo"].ToString();
+                        HttpContext.Current.Session["s_PanNo"] = dr["s_PanNo"].ToString();
+                        HttpContext.Current.Session["s_AdhaarNo"] = dr["s_AdhaarNo"].ToString();
+                        HttpContext.Current.Session["s_DateOfJoining"] = dr["s_DateOfJoining"].ToString();
+                    }
+
+                    txtOtp.Visible = true;
+                    btnVerify.Visible = true;
+                    otp.Visible = true;
+                }
+                catch (Exception)
+                {
+                    //if sending request or getting response is not successful, Ozeki NG - SMS Gateway Server may not be running
+                    lblmessage.Text = "This Phone Number is not a staff Please Contact to Admin";
+                    lblmessage.ForeColor = System.Drawing.Color.Blue;
+                    txtOtp.Text = string.Empty;
+                    lblmessage.Visible = true;
+                }
+
+
+            }
+            else
+            {
+                lblmessage.Text = "This Phone Number is not a staff Please Contact to Admin";
+                lblmessage.ForeColor = System.Drawing.Color.Blue;
+                txtOtp.Text = string.Empty;
+                // signupnow.Visible = true;
+            }
+        }
+        else
+        {
+            lblmessage.Text = "Please Enter Valid  Mobile Nomber";
+            lblmessage.ForeColor = System.Drawing.Color.Red;
+        }
+    }
+
+    protected void btnVerify_Click(object sender, EventArgs e)
+    {
+        if (Session["OTP"] != null)
+        {
+            if (Session["OTP"].ToString() == txtOtp.Text)
+            // if (sentOtp == Convert.ToInt32(txtOtp.Text))
+            {
+                lblmessage.Text = "You have enter correct OTP.";
+                Session["OTP"] = null;
+                Session.Remove("OTP");
+                Session["Result"] = "Successful";
+                Session["s_id"].ToString();
+                Session["s_Name"].ToString();
+                Session["s_MobileNo"].ToString();
+                Session["s_PanNo"].ToString();
+                Session["s_AdhaarNo"].ToString();
+                Session["s_DateOfJoining"].ToString();
+                Response.Redirect("~/Content/Home.aspx");
+            }
+            else
+            {
+                lblmessage.Text = "OTP does not matches";
+                lblmessage.ForeColor = System.Drawing.Color.Red;
+                txtOtp.Text = string.Empty;
+            }
+        }
+        else
+        {
+            lblmessage.Text = "You Are Already Logout Please login again";
+            lblmessage.ForeColor = System.Drawing.Color.Red;
+            txtOtp.Text = string.Empty;
+        }
+
+    }
+}
